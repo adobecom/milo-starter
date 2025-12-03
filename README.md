@@ -1,5 +1,5 @@
 # Milo goes to college
-Use this project template to create a Milo site on DA! [Opposed to ](https://github.com/adobecom/milo-college) is the Sharepoint equivalent to this project.
+Use this project template to create a Milo site on DA! [milo-college](https://github.com/adobecom/milo-college) is the Sharepoint equivalent to this project.
 
 ## Steps
 
