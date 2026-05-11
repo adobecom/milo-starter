@@ -38,47 +38,49 @@ This will give you several options to debug tests. Note: coverage may not be acc
 | Milo libs | `your-domain.com/libs/*` | `main--milo--adobecom.aem.live/libs/*` |
 | Project | `your-domain.com/*` | `main--{repo}--adobecom.aem.live/*` |
 
-No path rewriting needed. Use `aem.page` instead of `aem.live` for preview/stage.
+Use `aem.page` instead of `aem.live` for preview/stage. No path rewriting needed.
 
-> If your CDN can't proxy `/libs/*` to a different origin, set `LIBS` to the absolute URL in `scripts/scripts.js` and `head.html`:
-> ```js
-> const LIBS = 'https://www.adobe.com/libs';
-> ```
+The starter resolves Milo libs as `/libs` on production, relying on the CDN rule above to proxy the requests. If your CDN can't route `/libs/*` to a different origin, hardcode the absolute URL in both of these places:
 
-### Case 2 — project lives under a sub-path (e.g. `/foo/docs`)
+- `scripts/scripts.js`: `const LIBS = 'https://www.adobe.com/libs'`
+- `head.html` inline script: change `return '/libs'` → `return 'https://www.adobe.com/libs'`
+
+### Case 2 — project lives under a sub-path
+
+Example: site is at `your-domain.com/acme/blog`.
 
 | What | From | To | Strip prefix? |
 |------|------|----|---------------|
-| Milo libs | `your-domain.com/foo/docs/libs/*` | `main--milo--adobecom.aem.live/libs/*` | Yes |
-| Project code | `your-domain.com/foo/docs/{scripts,styles,blocks,...}/*` | `main--{repo}--adobecom.aem.live/{scripts,...}/*` | Yes |
-| Project content | `your-domain.com/foo/docs/*` | `main--{repo}--adobecom.aem.live/foo/docs/*` | **No** |
+| Milo libs | `your-domain.com/acme/blog/libs/*` | `main--milo--adobecom.aem.live/libs/*` | Yes |
+| Project code | `your-domain.com/acme/blog/{scripts,styles,blocks,...}/*` | `main--{repo}--adobecom.aem.live/{scripts,...}/*` | Yes |
+| Project content | `your-domain.com/acme/blog/*` | `main--{repo}--adobecom.aem.live/acme/blog/*` | **No** |
 
-Content must keep the full path — EDS derives `.plain.html` URLs from it. Stripping the prefix from content requests causes 404s.
+Use `aem.page` instead of `aem.live` for preview/stage.
 
-**SharePoint:** author all documents under the same path they'll appear at publicly (`/foo/docs/…`), not at the root.
+**Content must keep the full path.** EDS derives `.plain.html` URLs from the canonical path — stripping the prefix from content requests breaks page rendering.
+
+**SharePoint:** author all documents under the same sub-path they'll appear at publicly (`/acme/blog/…`), not at the root. This keeps AEM-generated links correct.
 
 Example CloudFront viewer-request function:
 
 ```js
-const PREFIX = '/foo/docs';
+const PREFIX = '/acme/blog';
+const CODE = ['/libs/', '/scripts/', '/styles/', '/blocks/', '/tools/', '/img/'];
 
 function handler(event) {
   const req = event.request;
-  if (
-    req.uri.startsWith(PREFIX + '/libs/')
-    || req.uri.endsWith('.js')
-    || req.uri.endsWith('.css')
-  ) {
-    req.uri = req.uri.slice(PREFIX.length) || '/';
+  const path = req.uri.slice(PREFIX.length);
+  if (CODE.some(p => path.startsWith(p))) {
+    req.uri = path || '/';
   }
   return req;
 }
 ```
 
 **Debugging:**
-- JS/CSS has wrong `Content-Type` → prefix stripping is missing; CDN is returning a 404 page instead of the file.
-- `.plain.html` returns 404 → prefix is being stripped from content; remove it from that rule.
-- Links go to the wrong URL → documents in SharePoint aren't authored with the full public path.
+- JS/CSS wrong `Content-Type` → prefix not being stripped; CDN is serving a 404 error page as the file.
+- `.plain.html` returns 404 → prefix is being stripped from content requests; restrict the rule to code paths only.
+- Links navigate to wrong URL → documents in SharePoint aren't authored with the full public path (e.g. `/acme/blog/page`, not `/page`).
 
 ## Security
 1. Create a Service Now ID for your project via [Service Registry Portal](https://adobe.service-now.com/service_registry_portal.do#/search)
