@@ -29,6 +29,59 @@ npm run test:watch
 ```
 This will give you several options to debug tests. Note: coverage may not be accurate.
 
+## CDN Configuration
+
+### Case 1 — project owns the root of the domain
+
+| What | From | To |
+|------|------|----|
+| Milo libs | `your-domain.com/libs/*` | `main--milo--adobecom.aem.live/libs/*` |
+| Project | `your-domain.com/*` | `main--{repo}--adobecom.aem.live/*` |
+
+Use `aem.page` instead of `aem.live` for preview/stage. No path rewriting needed.
+
+The starter resolves Milo libs as `/libs` on production, relying on the CDN rule above to proxy the requests. If your CDN can't route `/libs/*` to a different origin, hardcode the absolute URL in both of these places:
+
+- `scripts/scripts.js`: `const LIBS = 'https://www.adobe.com/libs'`
+- `head.html` inline script: change `return '/libs'` → `return 'https://www.adobe.com/libs'`
+
+### Case 2 — project lives under a sub-path
+
+Example: site is at `your-domain.com/acme/blog`.
+
+| What | From | To | Strip prefix? |
+|------|------|----|---------------|
+| Milo libs | `your-domain.com/acme/blog/libs/*` | `main--milo--adobecom.aem.live/libs/*` | Yes |
+| Project code | `your-domain.com/acme/blog/{scripts,styles,blocks,...}/*` | `main--{repo}--adobecom.aem.live/{scripts,...}/*` | Yes |
+| Project content | `your-domain.com/acme/blog/*` | `main--{repo}--adobecom.aem.live/acme/blog/*` | **No** |
+
+Use `aem.page` instead of `aem.live` for preview/stage.
+
+**Content must keep the full path.** EDS derives `.plain.html` URLs from the canonical path — stripping the prefix from content requests breaks page rendering.
+
+**SharePoint:** author all documents under the same sub-path they'll appear at publicly (`/acme/blog/…`), not at the root. This keeps AEM-generated links correct.
+
+Example CloudFront viewer-request function:
+
+```js
+const PREFIX = '/acme/blog';
+const CODE = ['/libs/', '/scripts/', '/styles/', '/blocks/', '/tools/', '/img/'];
+
+function handler(event) {
+  const req = event.request;
+  const path = req.uri.slice(PREFIX.length);
+  if (CODE.some(p => path.startsWith(p))) {
+    req.uri = path || '/';
+  }
+  return req;
+}
+```
+
+**Debugging:**
+- JS/CSS wrong `Content-Type` → prefix not being stripped; CDN is serving a 404 error page as the file.
+- `.plain.html` returns 404 → prefix is being stripped from content requests; restrict the rule to code paths only.
+- Links navigate to wrong URL → documents in SharePoint aren't authored with the full public path (e.g. `/acme/blog/page`, not `/page`).
+
 ## Security
 1. Create a Service Now ID for your project via [Service Registry Portal](https://adobe.service-now.com/service_registry_portal.do#/search)
 2. Update the `.kodiak/config.yaml` file to make sure valid team members are assigned security vulnerability Jira tickets.
