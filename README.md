@@ -42,7 +42,7 @@ No path rewriting needed. Use `aem.page` instead of `aem.live` for preview/stage
 
 > If your CDN can't proxy `/libs/*` to a different origin, set `LIBS` to the absolute URL in `scripts/scripts.js` and `head.html`:
 > ```js
-> const LIBS = 'https://milo.adobe.com/libs';
+> const LIBS = 'https://www.adobe.com/libs';
 > ```
 
 ### Case 2 — project lives under a sub-path (e.g. `/foo/docs`)
